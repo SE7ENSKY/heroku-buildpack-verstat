@@ -6,7 +6,7 @@ set -e
 BUILD_DIR=$1
 CACHE_DIR=$2
 
-cd BUILD_DIR
+cd $BUILD_DIR
 
 echo "-----> Installing NPM dependencies"
 npm install
@@ -16,8 +16,8 @@ node_modules/.bin/verstat -e static generate
 
 TMP_DIR=$(mktemp -d -t out.XXXXXX)
 mv out/* $TMP_DIR
-rm -rf $BUILD_DIR
-mv $TMP_DIR $BUILD_DIR
+rm -rf $BUILD_DIR/*
+mv $TMP_DIR/* $BUILD_DIR/
 
 if [ ! -f $BUILD_DIR/conf/nginx.conf.erb ]; then
 	cat <<EOF >"$BUILD_DIR/conf/nginx.conf.erb"
