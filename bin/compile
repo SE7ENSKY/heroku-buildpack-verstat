@@ -36,13 +36,13 @@ if [ ! -f $BUILD_DIR/conf/nginx.conf.erb ]; then
 types {
     text/html                             html htm shtml;
     text/css                              css;
-    text/xml                              xml;
+    text/xml                              xml rss;
     image/gif                             gif;
     image/jpeg                            jpeg jpg;
-    application/x-javascript              js;
+    application/javascript                js;
     application/atom+xml                  atom;
-    application/rss+xml                   rss;
 
+    text/cache-manifest                   manifest appcache;
     text/mathml                           mml;
     text/plain                            txt;
     text/vnd.sun.j2me.app-descriptor      jad;
@@ -50,12 +50,13 @@ types {
     text/x-component                      htc;
 
     image/png                             png;
+    image/svg+xml                         svg svgz;
     image/tiff                            tif tiff;
     image/vnd.wap.wbmp                    wbmp;
+    image/webp                            webp;
     image/x-icon                          ico;
     image/x-jng                           jng;
     image/x-ms-bmp                        bmp;
-    image/svg+xml                         svg;
 
     application/java-archive              jar war ear;
     application/mac-binhex40              hqx;
@@ -66,9 +67,8 @@ types {
     application/vnd.ms-excel              xls;
     application/vnd.ms-powerpoint         ppt;
     application/vnd.wap.wmlc              wmlc;
-    application/vnd.google-earth.kml+xml  kml;
-    application/vnd.google-earth.kmz      kmz;
-    application/x-7z-compressed           7z;
+    application/vnd.wap.xhtml+xml         xhtml;
+    application/x-chrome-extension        crx;
     application/x-cocoa                   cco;
     application/x-java-archive-diff       jardiff;
     application/x-java-jnlp-file          jnlp;
@@ -83,62 +83,124 @@ types {
     application/x-tcl                     tcl tk;
     application/x-x509-ca-cert            der pem crt;
     application/x-xpinstall               xpi;
-    application/xhtml+xml                 xhtml;
     application/zip                       zip;
 
     application/octet-stream              bin exe dll;
     application/octet-stream              deb;
     application/octet-stream              dmg;
-    application/octet-stream              eot;
     application/octet-stream              iso img;
     application/octet-stream              msi msp msm;
+    application/octet-stream              safariextz
 
     audio/midi                            mid midi kar;
     audio/mpeg                            mp3;
-    audio/ogg                             ogg;
     audio/x-realaudio                     ra;
+    audio/ogg                             oga ogg;
 
     video/3gpp                            3gpp 3gp;
     video/mpeg                            mpeg mpg;
+    video/ogg                             ogv;
     video/quicktime                       mov;
+    video/webm                            webm;
     video/x-flv                           flv;
     video/x-mng                           mng;
     video/x-ms-asf                        asx asf;
     video/x-ms-wmv                        wmv;
     video/x-msvideo                       avi;
+
+    application/vnd.ms-fontobject         eot;
+    font/truetype                         ttf;
+    font/opentype                         otf;
+    font/woff                             woff;
 }
 EOF
 
 	cat <<EOF >"$BUILD_DIR/conf/nginx.conf.erb"
-
-worker_processes  1;
+worker_processes  4;
+worker_rlimit_nofile 8192;
 daemon off;
 
 events {
-  worker_connections  1024;
+    worker_connections  8000;
+    accept_mutex off;
 }
 
-
 http {
-  include       mime.types;
-  default_type  application/octet-stream;
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
 
-  sendfile           on;
-  keepalive_timeout  65;
+    access_log  logs/access.log  main;
+    error_log   logs/error.log  notice;
 
-  server {
-    listen           <%= ENV['PORT'] %>;
-    server_name      localhost;
+    sendfile    on;
+    tcp_nopush  on;
+    tcp_nodelay off;
 
-    error_page  404 /404.html;
+    keepalive_timeout  65;
 
-    location / {
-      root .;
-      expires 180s;
-      add_header Vary Accept-Encoding;
+    gzip  on;
+    gzip_http_version 1.0;
+    gzip_comp_level 2;
+    gzip_min_length 1100;
+    gzip_buffers     4 8k;
+    gzip_proxied any;
+    gzip_types
+      # text/html is always compressed by HttpGzipModule
+      text/css
+      text/javascript
+      text/xml
+      text/plain
+      text/x-component
+      application/javascript
+      application/json
+      application/xml
+      application/rss+xml
+      font/truetype
+      font/opentype
+      application/vnd.ms-fontobject
+      image/svg+xml;
+
+    gzip_static on;
+
+    gzip_proxied        expired no-cache no-store private auth;
+    gzip_disable        "MSIE [1-6]\.";
+    gzip_vary           on;
+    
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    server {
+        server_name  localhost;
+        listen       <%= ENV['PORT'] %>;
+
+        error_page 404 403 /404.html;
+        root  <%= ENV['HOME'] %>;
+
+        autoindex           off;
+        index index.html;
+
+        try_files $uri $uri/ =404;
+        # opt-in to the future
+        # expires 2592000;
+        charset utf-8;
+
+        location ~ /\. {
+            deny            all;
+            access_log      off;
+            log_not_found   off;
+        }
+        
+        location ~* ^.+\.(html|htm|php|html.gz)$ {
+          add_header Cache-Control "max-age=0, no-cache";
+          add_header "X-UA-Compatible" "IE=Edge,chrome=1";
+        }
+        
+        location ~* ^.+\.(css|js|jpg|jpeg|gif|png|ico|gz|svg|svgz|ttf|otf|woff|eot|mp4|ogg|ogv|webm)$ {
+          access_log off;
+          add_header Cache-Control  "public, max-age=2592000";          
+        }        
     }
-  }
-
 }
 EOF
 
