@@ -32,7 +32,7 @@ mv $TMP_DIR/* $BUILD_DIR/
 
 if [ ! -f $BUILD_DIR/conf/nginx.conf.erb ]; then
     mkdir -p $BUILD_DIR/conf
-	cat <<EOF >"$BUILD_DIR/conf/nginx.conf.erb"
+	cat <<EOF >"$BUILD_DIR/conf/mime.types"
 types {
     text/html                             html htm shtml;
     text/css                              css;
