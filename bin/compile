@@ -2,13 +2,24 @@
 # bin/compile <build-dir> <cache-dir>
 
 set -e
+set -o pipefail
 
 BUILD_DIR=$1
 CACHE_DIR=$2
 
-cd $BUILD_DIR
+NODE_VERSION=0.10.28
+echo "-----> Installing Node.JS v$NODE_VERSION"
+NODE_URL="http://s3pository.heroku.com/node/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz"
+curl $NODE_URL -s -o - | tar xzf - -C $BUILD_DIR
+
+# Move node (and npm) into ./vendor and make them executable
+mkdir -p $BUILD_DIR/vendor
+mv $BUILD_DIR/node-v$NODE_VERSION-linux-x64 $BUILD_DIR/vendor/node
+chmod +x $BUILD_DIR/vendor/node/bin/*
+PATH=$BUILD_DIR/vendor/node/bin:$PATH
 
 echo "-----> Installing NPM dependencies"
+cd $BUILD_DIR
 npm install
 
 echo "-----> Generating website with Verstat"
