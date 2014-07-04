@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# bin/compile <build-dir> <cache-dir>
+
+set -e
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+
+cd BUILD_DIR
+
+echo "-----> Installing NPM dependencies"
+npm install
+
+echo "-----> Generating website with Verstat"
+node_modules/.bin/verstat -e static generate
+
+TMP_DIR=$(mktemp -d -t out.XXXXXX)
+mv out/* $TMP_DIR
+rm -rf $BUILD_DIR
+mv $TMP_DIR $BUILD_DIR
+
+if [ ! -f $BUILD_DIR/conf/nginx.conf.erb ]; then
+	cat <<EOF >"$BUILD_DIR/conf/nginx.conf.erb"
+types {
+    text/html                             html htm shtml;
+    text/css                              css;
+    text/xml                              xml;
+    image/gif                             gif;
+    image/jpeg                            jpeg jpg;
+    application/x-javascript              js;
+    application/atom+xml                  atom;
+    application/rss+xml                   rss;
+
+    text/mathml                           mml;
+    text/plain                            txt;
+    text/vnd.sun.j2me.app-descriptor      jad;
+    text/vnd.wap.wml                      wml;
+    text/x-component                      htc;
+
+    image/png                             png;
+    image/tiff                            tif tiff;
+    image/vnd.wap.wbmp                    wbmp;
+    image/x-icon                          ico;
+    image/x-jng                           jng;
+    image/x-ms-bmp                        bmp;
+    image/svg+xml                         svg;
+
+    application/java-archive              jar war ear;
+    application/mac-binhex40              hqx;
+    application/msword                    doc;
+    application/pdf                       pdf;
+    application/postscript                ps eps ai;
+    application/rtf                       rtf;
+    application/vnd.ms-excel              xls;
+    application/vnd.ms-powerpoint         ppt;
+    application/vnd.wap.wmlc              wmlc;
+    application/vnd.google-earth.kml+xml  kml;
+    application/vnd.google-earth.kmz      kmz;
+    application/x-7z-compressed           7z;
+    application/x-cocoa                   cco;
+    application/x-java-archive-diff       jardiff;
+    application/x-java-jnlp-file          jnlp;
+    application/x-makeself                run;
+    application/x-perl                    pl pm;
+    application/x-pilot                   prc pdb;
+    application/x-rar-compressed          rar;
+    application/x-redhat-package-manager  rpm;
+    application/x-sea                     sea;
+    application/x-shockwave-flash         swf;
+    application/x-stuffit                 sit;
+    application/x-tcl                     tcl tk;
+    application/x-x509-ca-cert            der pem crt;
+    application/x-xpinstall               xpi;
+    application/xhtml+xml                 xhtml;
+    application/zip                       zip;
+
+    application/octet-stream              bin exe dll;
+    application/octet-stream              deb;
+    application/octet-stream              dmg;
+    application/octet-stream              eot;
+    application/octet-stream              iso img;
+    application/octet-stream              msi msp msm;
+
+    audio/midi                            mid midi kar;
+    audio/mpeg                            mp3;
+    audio/ogg                             ogg;
+    audio/x-realaudio                     ra;
+
+    video/3gpp                            3gpp 3gp;
+    video/mpeg                            mpeg mpg;
+    video/quicktime                       mov;
+    video/x-flv                           flv;
+    video/x-mng                           mng;
+    video/x-ms-asf                        asx asf;
+    video/x-ms-wmv                        wmv;
+    video/x-msvideo                       avi;
+}
+EOF
+
+	cat <<EOF >"$BUILD_DIR/conf/nginx.conf.erb"
+
+worker_processes  1;
+daemon off;
+
+events {
+  worker_connections  1024;
+}
+
+
+http {
+  include       mime.types;
+  default_type  application/octet-stream;
+
+  sendfile           on;
+  keepalive_timeout  65;
+
+  server {
+    listen           <%= ENV['PORT'] %>;
+    server_name      localhost;
+
+    error_page  404 /404.html;
+
+    location / {
+      root .;
+      expires 180s;
+      add_header Vary Accept-Encoding;
+    }
+  }
+
+}
+EOF
+
+fi
+
+# nginx part taken from essh/heroku-buildpack-nginx
+
+echo "-----> Fetching nginx binaries"
+# config
+NGINX_VERSION="1.0.14"
+S3_BUCKET="essh-heroku-buildpack-nginx"
+# s3 packages
+NGINX_PACKAGE="http://${S3_BUCKET}.s3.amazonaws.com/nginx-${NGINX_VERSION}.tgz"
+# vendor directories
+VENDORED_NGINX=$(mktemp -d -t nginx.XXXXXX)
+# download and unpack packages
+curl $NGINX_PACKAGE -s -o - | tar xzf - -C $VENDORED_NGINX
+
+echo "-----> Vendoring nginx $NGINX_VERSION"
+# vendor nginx into the slug
+mkdir -p "$BUILD_DIR/bin"
+cp "$VENDORED_NGINX/sbin/nginx" "$BUILD_DIR/bin/nginx"
+
+# build a startup script
+cat <<EOF >"$BUILD_DIR/bin/start_nginx"
+#!/usr/bin/env bash
+erb conf/nginx.conf.erb > conf/nginx.conf
+mkdir -p logs
+touch logs/access.log logs/error.log
+(tail -qF -n 0 --pid=\$\$ logs/*.log &)
+exec bin/nginx -p .
+EOF
+chmod +x "$BUILD_DIR/bin/start_nginx"

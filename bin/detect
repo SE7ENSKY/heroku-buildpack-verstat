@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# bin/detect <build-dir>
+
+V=`[ -f $1/package.json ] && cat $1/package.json | grep '"verstat"'`
+
+if [ "$V" != "" ]; then
+	echo "Verstat" && exit 0
+else
+	echo "no" && exit 1
+fi
