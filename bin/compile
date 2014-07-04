@@ -31,6 +31,7 @@ rm -rf $BUILD_DIR/*
 mv $TMP_DIR/* $BUILD_DIR/
 
 if [ ! -f $BUILD_DIR/conf/nginx.conf.erb ]; then
+    mkdir -p $BUILD_DIR/conf
 	cat <<EOF >"$BUILD_DIR/conf/nginx.conf.erb"
 types {
     text/html                             html htm shtml;
