@@ -174,18 +174,20 @@ http {
         server_name  localhost;
         listen       <%= ENV['PORT'] %>;
 
-        error_page 404 403 /404.html;
-        root  .;
-
         autoindex           off;
-        index index.html;
 
         add_header Vary Accept-Encoding;
 
-        try_files $uri $uri/ =404;
+
         # opt-in to the future
         # expires 2592000;
         charset utf-8;
+
+        location / {
+            root  .;
+            error_page 404 403 /404.html;
+            try_files $uri $uri/index.html $uri.html =404;
+        }
 
         location ~ /\. {
             deny            all;
