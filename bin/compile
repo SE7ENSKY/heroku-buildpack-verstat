@@ -180,6 +180,8 @@ http {
         autoindex           off;
         index index.html;
 
+        add_header Vary Accept-Encoding;
+
         try_files $uri $uri/ =404;
         # opt-in to the future
         # expires 2592000;
