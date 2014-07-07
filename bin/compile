@@ -116,12 +116,12 @@ types {
 EOF
 
 	cat <<EOF >"$BUILD_DIR/conf/nginx.conf.erb"
-worker_processes  4;
+worker_processes  2;
 worker_rlimit_nofile 8192;
 daemon off;
 
 events {
-    worker_connections  8000;
+    worker_connections  2048;
     accept_mutex off;
 }
 
@@ -175,7 +175,7 @@ http {
         listen       <%= ENV['PORT'] %>;
 
         error_page 404 403 /404.html;
-        root  <%= ENV['HOME'] %>;
+        root  .;
 
         autoindex           off;
         index index.html;
